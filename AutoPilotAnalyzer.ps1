@@ -10,7 +10,7 @@ Provides functionality for managing Autopilot profiles, including:
 - Register device in Autopilot with dynamic GroupTag input
 
 .VERSION
-2.1.0
+2.2.0
 
 .AUTHOR
 Your Name
@@ -201,7 +201,7 @@ do {
          default {Write-host "`nInvalid selection!" `
              Foregroundcolor red}
      }
-} while ($selection.ToUpper() ne 'Q')
+} while ($selection.ToUpper() -ne 'Q')
 
 Write-host "`Script terminated gracefully!" -ForegroundColor Green
 
