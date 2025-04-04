@@ -1,16 +1,16 @@
 <#
 .SYNOPSIS
-Autopilot Management and Diagnostics Toolkit
+Autopilot Management Toolkit with Auto-Elevation and Execution Policy Bypass
 
 .DESCRIPTION
-Provides comprehensive Autopilot management capabilities including:
-- Remote assistance integration
-- Configuration diagnostics
-- Profile maintenance
-- Device registration
+Provides functionality for managing Autopilot profiles, including:
+- Download and launch TeamViewer QuickSupport
+- Display current Autopilot configuration
+- Clean Autopilot profile and reboot
+- Register device in Autopilot with dynamic GroupTag input
 
 .VERSION
-2.0.1
+2.1.0
 
 .AUTHOR
 Your Name
@@ -24,12 +24,27 @@ Tested OS: Windows 10 22H2, Windows 11 23H2
 https://learn.microsoft.com/en-us/autopilot
 #>
 
+# Self-relaunch mechanism with execution policy bypass
+if ((Get-ExecutionPolicy -Scope Process) -ne 'Bypass') {
+    $scriptPath = $MyInvocation.MyCommand.Path
+    $arguments = @(
+        '-ExecutionPolicy Bypass',
+        '-NoProfile',
+        '-File "{}"' -f $scriptPath
+    ) -join ' '
+    
+    try {
+        Start-Process powershell.exe -ArgumentList $arguments -Verb RunAs
+    }
+    catch {
+        Write-Host "Elevation failed: User canceled UAC prompt" -ForegroundColor Red
+    }
+    exit
+}
+
+# Requires admin from this point forward
 #Requires -RunAsAdministrator
 
-<#
-.SYNOPSIS
-Displays the main interactive menu
-#>
 function Show-Menu {
     Clear-Host
     Write-Host "=============== Autopilot Management Suite ===============" -ForegroundColor Cyan
@@ -41,13 +56,6 @@ function Show-Menu {
     Write-Host "==========================================================" -ForegroundColor Cyan
 }
 
-<#
-.SYNOPSIS
-Downloads and launches TeamViewer QuickSupport client
-.DESCRIPTION
-- Downloads latest TeamViewer QuickSupport edition
-- Executes the client directly from temp storage
-#>
 function Invoke-TeamViewerQuickSupport {
     try {
         $tvPath = "$env:TEMP\TeamViewerQS.exe"
@@ -66,13 +74,6 @@ function Invoke-TeamViewerQuickSupport {
     }
 }
 
-<#
-.SYNOPSIS
-Displays current Autopilot configuration details
-.DESCRIPTION
-- Shows JSON configuration file in Notepad
-- Displays registry settings
-#>
 function Show-AutopilotInfo {
     $configFile = "C:\Windows\ServiceState\wmansvc\AutopilotDDSZTDfile.json"
     $regPath = "HKLM:\SOFTWARE\Microsoft\Provisioning\Diagnostics\AutoPilot"
@@ -106,14 +107,6 @@ function Show-AutopilotInfo {
     }
 }
 
-<#
-.SYNOPSIS
-Performs Autopilot profile cleanup
-.DESCRIPTION
-- Removes registry entries
-- Deletes configuration files
-- Optionally reboots system
-#>
 function Clear-AutopilotProfile {
     $configFile = "C:\Windows\ServiceState\wmansvc\AutopilotDDSZTDfile.json"
     $regPath = "HKLM:\SOFTWARE\Microsoft\Provisioning\Diagnostics\AutoPilot"
@@ -147,64 +140,67 @@ function Clear-AutopilotProfile {
     }
 }
 
-<#
-.SYNOPSIS
-Registers device in Microsoft Autopilot
-.DESCRIPTION
-- Collects hardware hash
-- Registers device with Microsoft Intune
-- Requires valid GroupTag input
-#>
 function Register-AutopilotDevice {
     try {
         $groupTag = Read-Host "`nEnter GroupTag for registration"
         $workingDir = "C:\HWID"
         
-        # Environment setup
+        # Environment setup for TLS and working directory creation.
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        New-Item -Path $workingDir -ItemType Directory -Force -ErrorAction Stop | Out-Null
-        Set-Location -Path $workingDir -ErrorAction Stop
+        
+        New-Item -Path $workingDir -ItemType Directory -Force | Out-Null 
+        Set-Location -Path $workingDir
 
-        # Package management
-        Write-Host "Configuring environment..." -ForegroundColor Gray
-        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction Stop | Out-Null
-        Install-Script -Name Get-WindowsAutopilotInfo -Confirm:$false -Force -ErrorAction Stop | Out-Null
+        # Install required PowerShell modules and scripts.
+        Install-PackageProvider `
+            -Name NuGet `
+            -MinimumVersion 2.8.5.201 `
+            -Force | Out-Null
+        
+        Install-Script `
+            -Name Get-WindowsAutopilotInfo `
+            -Confirm:$false `
+            -Force | Out-Null
 
-        # Generate output filename
+        # Generate output filename based on computer name.
         $outputFile = "AutopilotHWID-$($env:COMPUTERNAME).csv"
 
-        # Execute registration
-        Write-Host "Starting Autopilot registration..." -ForegroundColor Cyan
-        Get-WindowsAutopilotInfo -GroupTag $groupTag -Online -OutputFile $outputFile -ErrorAction Stop
+        # Execute the script to collect hardware hash and register device.
+        Get-WindowsAutopilotInfo `
+            -GroupTag $groupTag `
+            -Online `
+            -OutputFile $outputFile
         
-        Write-Host "`nRegistration successful!" -ForegroundColor Green
-        Write-Host "Output file: $workingDir\$outputFile" -ForegroundColor Cyan
+        Write-Host "`nRegistration successful!" `
+            -ForegroundColor Green
+        
+        Write-Host "`nOutput file saved at: $workingDir\$outputFile" `
+            -ForegroundColor Cyan
+
     }
     catch {
-        Write-Host "[ERROR] Registration failed: $_" -ForegroundColor Red
-    }
-    finally {
-        Set-ExecutionPolicy -Scope Process -ExecutionPolicy Restricted -Force
+        Write-Host "[ERROR] Registration failed: $_" `
+            -ForegroundColor Red
+
     }
 }
 
-# Main execution loop
+# Main execution loop.
 do {
     Show-Menu
+    
+    # Prompt user for menu selection.
     $selection = Read-Host "`nEnter selection"
 
-    switch ($selection) {
-        '1' { Invoke-TeamViewerQuickSupport }
-        '2' { Show-AutopilotInfo }
-        '3' { Clear-AutopilotProfile }
-        '4' { Register-AutopilotDevice }
-        'Q' { break }
-        default { Write-Host "Invalid selection" -ForegroundColor Red }
-    }
+    switch ($selection) {        
+         '1' { Invoke-TeamViewerQuickSupport } 
+         '2' { Show-AutopilotInfo } 
+         '3' { Clear-AutopilotProfile } 
+         '4' { Register-AutopilotDevice }         
+         'Q' { break } 
+         default {Write-host "`nInvalid selection!" `
+             Foregroundcolor red}
+     }
+} while ($selection.ToUpper() -ne 'Q')
 
-    if ($selection -ne 'Q') {
-        Pause
-    }
-} while ($selection -ne 'Q')
-
-Write-Host "`nSession terminated" -ForegroundColor Cyan
+Write-host "`Script terminated gracefully!"
