@@ -1,142 +1,210 @@
 <#
 .SYNOPSIS
-Autopilot Maintenance Utility with TeamViewer QuickSupport integration
+Autopilot Management and Diagnostics Toolkit
 
 .DESCRIPTION
-Provides automated maintenance functions for Autopilot environments including:
-- Remote assistance via TeamViewer
-- Autopilot configuration diagnostics
-- Profile cleanup and reset operations
+Provides comprehensive Autopilot management capabilities including:
+- Remote assistance integration
+- Configuration diagnostics
+- Profile maintenance
+- Device registration
 
 .VERSION
-1.2.0
+2.0.1
 
 .AUTHOR
 Your Name
 
 .NOTES
-Created:  07/02/2025
-Modified: 07/02/2025
-Requires PowerShell 7.0+ and administrative privileges
-
-.CHANGELOG
-v1.2.0 - Added registry safety checks and reboot confirmation
-v1.1.0 - Implemented logging and error handling improvements
-v1.0.0 - Initial release with core functionality
+Last Updated: April 04, 2025
+Requires: PowerShell 7.0+, Administrative Privileges
+Tested OS: Windows 10 22H2, Windows 11 23H2
 
 .LINK
 https://learn.microsoft.com/en-us/autopilot
 #>
+
 #Requires -RunAsAdministrator
 
+<#
+.SYNOPSIS
+Displays the main interactive menu
+#>
 function Show-Menu {
     Clear-Host
-    Write-Host "================ Autopilot Maintenance ================"
-    Write-Host "1: Download and Launch TeamViewer Quick Support"
-    Write-Host "2: Show Current Autopilot Profile Info"
-    Write-Host "3: Clean Autopilot Profile and Reboot"
-    Write-Host "Q: Exit"
-    Write-Host "======================================================="
+    Write-Host "=============== Autopilot Management Suite ===============" -ForegroundColor Cyan
+    Write-Host " 1: Launch TeamViewer Quick Support" -ForegroundColor Yellow
+    Write-Host " 2: Display Autopilot Configuration" -ForegroundColor Green
+    Write-Host " 3: Reset Autopilot Profile & Reboot" -ForegroundColor Magenta
+    Write-Host " 4: Register Device in Autopilot" -ForegroundColor Blue
+    Write-Host " Q: Exit" -ForegroundColor Red
+    Write-Host "==========================================================" -ForegroundColor Cyan
 }
 
+<#
+.SYNOPSIS
+Downloads and launches TeamViewer QuickSupport client
+.DESCRIPTION
+- Downloads latest TeamViewer QuickSupport edition
+- Executes the client directly from temp storage
+#>
 function Invoke-TeamViewerQuickSupport {
-    $tvPath = "$env:TEMP\TeamViewerQS.exe"
-    
     try {
-        Write-Host "Downloading TeamViewer Quick Support..."
-        Invoke-WebRequest -Uri "https://download.teamviewer.com/download/TeamViewerQS.exe" -OutFile $tvPath -ErrorAction Stop
+        $tvPath = "$env:TEMP\TeamViewerQS.exe"
         
+        Write-Host "[$(Get-Date)] Downloading TeamViewer..." -ForegroundColor Gray
+        Invoke-WebRequest -Uri "https://download.teamviewer.com/download/TeamViewerQS.exe" `
+            -OutFile $tvPath -ErrorAction Stop
+
         if (Test-Path $tvPath) {
-            Write-Host "Launching TeamViewer..."
+            Write-Host "Launching TeamViewer QuickSupport..." -ForegroundColor Cyan
             Start-Process -FilePath $tvPath
         }
     }
     catch {
-        Write-Host "Error downloading/running TeamViewer: $_" -ForegroundColor Red
+        Write-Host "[ERROR] TeamViewer operation failed: $_" -ForegroundColor Red
     }
 }
 
+<#
+.SYNOPSIS
+Displays current Autopilot configuration details
+.DESCRIPTION
+- Shows JSON configuration file in Notepad
+- Displays registry settings
+#>
 function Show-AutopilotInfo {
-    $filePath = "C:\Windows\ServiceState\wmansvc\AutopilotDDSZTDfile.json"
+    $configFile = "C:\Windows\ServiceState\wmansvc\AutopilotDDSZTDfile.json"
     $regPath = "HKLM:\SOFTWARE\Microsoft\Provisioning\Diagnostics\AutoPilot"
 
-    # Show file contents
-    if (Test-Path $filePath) {
+    # Display configuration file
+    if (Test-Path $configFile) {
         try {
-            Start-Process notepad.exe $filePath
+            Write-Host "Opening configuration file..." -ForegroundColor Cyan
+            Start-Process notepad.exe $configFile
         }
         catch {
-            Write-Host "Error opening file: $_" -ForegroundColor Red
+            Write-Host "[ERROR] File access denied: $configFile" -ForegroundColor Red
         }
     }
     else {
-        Write-Host "Autopilot configuration file not found" -ForegroundColor Yellow
+        Write-Host "Configuration file not found" -ForegroundColor Yellow
     }
 
-    # Show registry contents
+    # Display registry information
     if (Test-Path $regPath) {
         try {
-            Write-Host "`nAutopilot Registry Values:"
-            Get-ItemProperty -Path $regPath | Format-List
+            Write-Host "`nAutopilot Registry Configuration:" -ForegroundColor Cyan
+            Get-ItemProperty -Path $regPath | Format-List *
         }
         catch {
-            Write-Host "Error reading registry: $_" -ForegroundColor Red
+            Write-Host "[ERROR] Registry access denied" -ForegroundColor Red
         }
     }
     else {
-        Write-Host "Autopilot registry key not found" -ForegroundColor Yellow
+        Write-Host "Registry keys not found" -ForegroundColor Yellow
     }
 }
 
+<#
+.SYNOPSIS
+Performs Autopilot profile cleanup
+.DESCRIPTION
+- Removes registry entries
+- Deletes configuration files
+- Optionally reboots system
+#>
 function Clear-AutopilotProfile {
-    $filePath = "C:\Windows\ServiceState\wmansvc\AutopilotDDSZTDfile.json"
+    $configFile = "C:\Windows\ServiceState\wmansvc\AutopilotDDSZTDfile.json"
     $regPath = "HKLM:\SOFTWARE\Microsoft\Provisioning\Diagnostics\AutoPilot"
 
-    # Delete registry entries
+    # Remove registry entries
     if (Test-Path $regPath) {
         try {
             Remove-Item -Path $regPath -Recurse -Force
-            Write-Host "Successfully removed Autopilot registry entries" -ForegroundColor Green
+            Write-Host "Registry entries cleared successfully" -ForegroundColor Green
         }
         catch {
-            Write-Host "Error deleting registry key: $_" -ForegroundColor Red
+            Write-Host "[ERROR] Failed to remove registry keys: $_" -ForegroundColor Red
         }
     }
 
-    # Delete configuration file
-    if (Test-Path $filePath) {
+    # Remove configuration file
+    if (Test-Path $configFile) {
         try {
-            Remove-Item -Path $filePath -Force
-            Write-Host "Successfully removed Autopilot configuration file" -ForegroundColor Green
+            Remove-Item -Path $configFile -Force
+            Write-Host "Configuration file removed" -ForegroundColor Green
         }
         catch {
-            Write-Host "Error deleting file: $_" -ForegroundColor Red
+            Write-Host "[ERROR] Failed to delete configuration file: $_" -ForegroundColor Red
         }
     }
 
-    # Prompt for reboot
-    $choice = Read-Host "`nCleaning complete. Reboot now? (Y/N)"
-    if ($choice -eq "Y") {
+    # Reboot confirmation
+    $choice = Read-Host "`nReboot required. Proceed? (Y/N)"
+    if ($choice -in ('Y','y')) {
         Restart-Computer -Force
     }
 }
 
-# Main loop
+<#
+.SYNOPSIS
+Registers device in Microsoft Autopilot
+.DESCRIPTION
+- Collects hardware hash
+- Registers device with Microsoft Intune
+- Requires valid GroupTag input
+#>
+function Register-AutopilotDevice {
+    try {
+        $groupTag = Read-Host "`nEnter GroupTag for registration"
+        $workingDir = "C:\HWID"
+        
+        # Environment setup
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        New-Item -Path $workingDir -ItemType Directory -Force -ErrorAction Stop | Out-Null
+        Set-Location -Path $workingDir -ErrorAction Stop
+
+        # Package management
+        Write-Host "Configuring environment..." -ForegroundColor Gray
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction Stop | Out-Null
+        Install-Script -Name Get-WindowsAutopilotInfo -Confirm:$false -Force -ErrorAction Stop | Out-Null
+
+        # Generate output filename
+        $outputFile = "AutopilotHWID-$($env:COMPUTERNAME).csv"
+
+        # Execute registration
+        Write-Host "Starting Autopilot registration..." -ForegroundColor Cyan
+        Get-WindowsAutopilotInfo -GroupTag $groupTag -Online -OutputFile $outputFile -ErrorAction Stop
+        
+        Write-Host "`nRegistration successful!" -ForegroundColor Green
+        Write-Host "Output file: $workingDir\$outputFile" -ForegroundColor Cyan
+    }
+    catch {
+        Write-Host "[ERROR] Registration failed: $_" -ForegroundColor Red
+    }
+    finally {
+        Set-ExecutionPolicy -Scope Process -ExecutionPolicy Restricted -Force
+    }
+}
+
+# Main execution loop
 do {
     Show-Menu
-    $selection = Read-Host "`nPlease make a selection"
-    
+    $selection = Read-Host "`nEnter selection"
+
     switch ($selection) {
         '1' { Invoke-TeamViewerQuickSupport }
         '2' { Show-AutopilotInfo }
         '3' { Clear-AutopilotProfile }
+        '4' { Register-AutopilotDevice }
         'Q' { break }
         default { Write-Host "Invalid selection" -ForegroundColor Red }
     }
-    
+
     if ($selection -ne 'Q') {
         Pause
     }
 } while ($selection -ne 'Q')
 
-Write-Host "Script exited gracefully" -ForegroundColor Green
+Write-Host "`nSession terminated" -ForegroundColor Cyan
