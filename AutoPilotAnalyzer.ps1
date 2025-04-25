@@ -9,9 +9,10 @@ Provides functionality for managing Autopilot profiles, including:
 - Clean Autopilot profile and reboot
 - Register device in Autopilot with dynamic GroupTag input
 - Community diagnostics and TPM attestation verification
+- Download and launch Process Explorer (procexp.exe)
 
 .VERSION
-2.3.0
+2.4.0
 
 .AUTHOR
 Your Name
@@ -55,6 +56,7 @@ function Show-Menu {
     Write-Host " 4: Register Device in Autopilot" -ForegroundColor Blue
     Write-Host " 5: Run Community Diagnostics Script" -ForegroundColor DarkCyan
     Write-Host " 6: Perform TPM Attestation Check" -ForegroundColor DarkMagenta
+    Write-Host " 7: Download and Launch Process Explorer" -ForegroundColor DarkYellow
     Write-Host " Q: Exit" -ForegroundColor Red
     Write-Host "==========================================================" -ForegroundColor Cyan
 }
@@ -237,6 +239,27 @@ function Invoke-TpmAttestationCheck {
     }
 }
 
+function Invoke-ProcessExplorer {
+    try {
+        $procexpPath = "$env:TEMP\procexp.exe"
+        Write-Host "[$(Get-Date)] Downloading Process Explorer (procexp.exe)..." -ForegroundColor Gray
+        Invoke-WebRequest -Uri "https://live.sysinternals.com/procexp.exe" -OutFile $procexpPath -ErrorAction Stop
+
+        if (Test-Path $procexpPath) {
+            Write-Host "Launching Process Explorer..." -ForegroundColor Cyan
+            Start-Process -FilePath $procexpPath
+        } else {
+            Write-Host "[ERROR] procexp.exe not found after download." -ForegroundColor Red
+        }
+    }
+    catch {
+        Write-Host "[ERROR] Failed to download or launch Process Explorer: $_" -ForegroundColor Red
+    }
+    finally {
+        Read-Host "`nPress Enter to continue..."
+    }
+}
+
 # Main execution loop.
 do {
     Show-Menu
@@ -251,6 +274,7 @@ do {
          '4' { Register-AutopilotDevice }  
          '5' { Invoke-AutopilotDiagnosticsCommunity }
          '6' { Invoke-TpmAttestationCheck }
+         '7' { Invoke-ProcessExplorer }
          'Q' { break } 
          default {Write-host "`nInvalid selection!" -Foregroundcolor red}
      }
