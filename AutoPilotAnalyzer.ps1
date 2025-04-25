@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Autopilot Management Toolkit with Auto-Elevation and Execution Policy Bypass
+Autopilot Management Toolkit with Enhanced Diagnostics and Attestation Checks
 
 .DESCRIPTION
 Provides functionality for managing Autopilot profiles, including:
@@ -8,15 +8,16 @@ Provides functionality for managing Autopilot profiles, including:
 - Display current Autopilot configuration
 - Clean Autopilot profile and reboot
 - Register device in Autopilot with dynamic GroupTag input
+- Community diagnostics and TPM attestation verification
 
 .VERSION
-2.2.0
+2.3.0
 
 .AUTHOR
 Your Name
 
 .NOTES
-Last Updated: April 04, 2025
+Last Updated: April 25, 2025
 Requires: PowerShell 7.0+, Administrative Privileges
 Tested OS: Windows 10 22H2, Windows 11 23H2
 
@@ -52,6 +53,8 @@ function Show-Menu {
     Write-Host " 2: Display Autopilot Configuration" -ForegroundColor Green
     Write-Host " 3: Reset Autopilot Profile & Reboot" -ForegroundColor Magenta
     Write-Host " 4: Register Device in Autopilot" -ForegroundColor Blue
+    Write-Host " 5: Run Community Diagnostics Script" -ForegroundColor DarkCyan
+    Write-Host " 6: Perform TPM Attestation Check" -ForegroundColor DarkMagenta
     Write-Host " Q: Exit" -ForegroundColor Red
     Write-Host "==========================================================" -ForegroundColor Cyan
 }
@@ -185,6 +188,55 @@ function Register-AutopilotDevice {
     }
 }
 
+function Invoke-AutopilotDiagnosticsCommunity {
+    try {
+        Write-Host "Installing Get-AutopilotDiagnosticsCommunity from PowerShell Gallery..." -ForegroundColor Cyan
+        Install-Script -Name Get-AutopilotDiagnosticsCommunity -Force -ErrorAction Stop
+
+        Write-Host "Running Get-AutopilotDiagnosticsCommunity script locally..." -ForegroundColor Cyan
+        $scriptPath = Join-Path -Path (Get-Location) -ChildPath "Get-AutopilotDiagnosticsCommunity.ps1"
+        if (Test-Path $scriptPath) {
+            & $scriptPath
+        } else {
+            # Try to find it in default script path
+            $defaultScriptPath = "$env:ProgramFiles\WindowsPowerShell\Scripts\Get-AutopilotDiagnosticsCommunity.ps1"
+            if (Test-Path $defaultScriptPath) {
+                & $defaultScriptPath
+            } else {
+                Write-Host "[ERROR] Get-AutopilotDiagnosticsCommunity.ps1 not found after installation." -ForegroundColor Red
+            }
+        }
+    }
+    catch {
+        Write-Host "[ERROR] Failed to install or run Get-AutopilotDiagnosticsCommunity: $_" -ForegroundColor Red
+    }
+    finally {
+        Read-Host "`nPress Enter to continue..."
+    }
+}
+
+function Invoke-TpmAttestationCheck {
+    try {
+        Write-Host "`nInstalling AutopilotTestAttestation Module..." -ForegroundColor Cyan
+        Install-Module -Name Autopilottestattestation -Force -ErrorAction Stop
+
+        Write-Host "Setting Execution Policy for this session..." -ForegroundColor Cyan
+        Set-ExecutionPolicy RemoteSigned -Scope Process -Force
+
+        Write-Host "Importing Module..." -ForegroundColor Cyan
+        Import-Module -Name Autopilottestattestation -Force
+
+        Write-Host "`n=== TPM Attestation Check ===" -ForegroundColor Yellow
+        Test-AutopilotAttestation
+    }
+    catch {
+        Write-Host "[ERROR] TPM Check failed: $_" -ForegroundColor Red
+    }
+    finally {
+        Read-Host "`nPress Enter to continue..."
+    }
+}
+
 # Main execution loop.
 do {
     Show-Menu
@@ -196,12 +248,12 @@ do {
          '1' { Invoke-TeamViewerQuickSupport } 
          '2' { Show-AutopilotInfo } 
          '3' { Clear-AutopilotProfile } 
-         '4' { Register-AutopilotDevice }         
+         '4' { Register-AutopilotDevice }  
+         '5' { Invoke-AutopilotDiagnosticsCommunity }
+         '6' { Invoke-TpmAttestationCheck }
          'Q' { break } 
-         default {Write-host "`nInvalid selection!" `
-             Foregroundcolor red}
+         default {Write-host "`nInvalid selection!" -Foregroundcolor red}
      }
 } while ($selection.ToUpper() -ne 'Q')
 
-Write-host "`Script terminated gracefully!" -ForegroundColor Green
-
+Write-host "`nScript terminated gracefully!" -ForegroundColor Green
