@@ -11,9 +11,10 @@ Autopilot Management Toolkit – Kompatibel mit Windows PowerShell 5.1
 - TPM Attestation Check
 - Process Explorer herunterladen und starten
 - Gerät neu starten
+- TPM sicher löschen (für OS-Downgrade-Szenarien)
 
 .VERSION
-2.4.2
+2.5.0
 
 .AUTHOR
 Andreas Müller 2
@@ -35,6 +36,7 @@ function Show-Menu {
     Write-Host " 6: Perform TPM Attestation Check" -ForegroundColor DarkMagenta
     Write-Host " 7: Download and Launch Process Explorer" -ForegroundColor DarkYellow
     Write-Host " 8: Reboot Device Only" -ForegroundColor White
+    Write-Host " 9: Downgrade OS to Win10 22H2 or Win11 23H2 - Clear TPM" -ForegroundColor DarkRed
     Write-Host " Q: Exit" -ForegroundColor Red
     Write-Host "==========================================================" -ForegroundColor Cyan
 }
@@ -184,6 +186,25 @@ function Invoke-RebootDevice {
     }
 }
 
+function Invoke-ClearTPM-AfterDowngrade  {
+    try {
+        Write-Host "`n=== TPM Status Before Clearing ===" -ForegroundColor Yellow
+        Get-TPM
+        Read-Host "`nPress Enter to continue with TPM clearing..."
+
+        Write-Host "`nForcing TPM clear and initialization..." -ForegroundColor Cyan
+        Initialize-TPM -AllowClear -AllowPhysicalPresence
+        Clear-TPM
+
+        Write-Host "`n=== TPM Status After Clearing ===" -ForegroundColor Yellow
+        Get-TPM
+    }
+    catch {
+        Write-Host "[ERROR] TPM downgrade and clear failed: $_" -ForegroundColor Red
+    }
+    Read-Host "`nPress Enter to continue..."
+}
+
 # Main execution loop.
 do {
     Show-Menu
@@ -197,6 +218,7 @@ do {
          '6' { Invoke-TpmAttestationCheck }
          '7' { Invoke-ProcessExplorer }
          '8' { Invoke-RebootDevice }
+         '9' { Invoke-ClearTPM-AfterDowngrade }
          'Q' { break } 
          default {Write-host "`nInvalid selection!" -Foregroundcolor red}
      }
