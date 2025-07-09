@@ -12,9 +12,12 @@ Autopilot Management Toolkit – Kompatibel mit Windows PowerShell 5.1
 - Process Explorer herunterladen und starten
 - Gerät neu starten
 - TPM sicher löschen (für OS-Downgrade-Szenarien)
+- 10: Open wmansvc folder in Explorer
+- 11: Open AutopilotDDSZTDFile.json in Notepad
+
 
 .VERSION
-2.5.0
+2.6.0
 
 .AUTHOR
 Andreas Müller 2
@@ -37,6 +40,8 @@ function Show-Menu {
     Write-Host " 7: Download and Launch Process Explorer" -ForegroundColor DarkYellow
     Write-Host " 8: Reboot Device Only" -ForegroundColor White
     Write-Host " 9: Downgrade OS to Win10 22H2 or Win11 23H2 - Clear TPM" -ForegroundColor DarkRed
+    Write-Host " 10: Open wmansvc folder in Explorer" -ForegroundColor DarkGreen
+    Write-Host " 11: Open AutopilotDDSZTDFile.json in Notepad" -ForegroundColor DarkGreen
     Write-Host " Q: Exit" -ForegroundColor Red
     Write-Host "==========================================================" -ForegroundColor Cyan
 }
@@ -203,6 +208,27 @@ function Invoke-ClearTPM-AfterDowngrade  {
         Write-Host "[ERROR] TPM downgrade and clear failed: $_" -ForegroundColor Red
     }
     Read-Host "`nPress Enter to continue..."
+
+    function Open-WmansvcFolder {
+        $folderPath = "C:\Windows\ServiceState\wmansvc"
+        if (Test-Path $folderPath) {
+            Write-Host "Opening folder: $folderPath" -ForegroundColor Cyan
+            Start-Process explorer.exe $folderPath
+        } else {
+            Write-Host "Folder not found: $folderPath" -ForegroundColor Red
+        }
+    }
+    
+    function Open-AutopilotConfigFile {
+        $filePath = "C:\Windows\ServiceState\wmansvc\AutopilotDDSZTDFile.json"
+        if (Test-Path $filePath) {
+            Write-Host "Opening file: $filePath" -ForegroundColor Cyan
+            Start-Process notepad.exe $filePath
+        } else {
+            Write-Host "File not found: $filePath" -ForegroundColor Red
+        }
+    }
+    
 }
 
 # Main execution loop.
@@ -219,6 +245,8 @@ do {
          '7' { Invoke-ProcessExplorer }
          '8' { Invoke-RebootDevice }
          '9' { Invoke-ClearTPM-AfterDowngrade }
+         '10' { Open-WmansvcFolder }
+         '11' { Open-AutopilotConfigFile }
          'Q' { break } 
          default {Write-host "`nInvalid selection!" -Foregroundcolor red}
      }
