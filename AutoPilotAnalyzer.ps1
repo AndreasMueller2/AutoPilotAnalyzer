@@ -10,9 +10,10 @@ Autopilot Management Toolkit – Kompatibel mit Windows PowerShell 5.1
 - Community Diagnostics Script ausführen
 - TPM Attestation Check
 - Process Explorer herunterladen und starten
+- Gerät neu starten
 
 .VERSION
-2.4.1
+2.4.2
 
 .AUTHOR
 Andreas Müller 2
@@ -21,7 +22,6 @@ Andreas Müller 2
 Getestet mit Windows PowerShell 5.1 (Windows 10 22H2, Windows 11 24H2)
 #>
 
-# TLS 1.2 aktivieren für Web-Downloads
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 function Show-Menu {
@@ -34,6 +34,7 @@ function Show-Menu {
     Write-Host " 5: Run Community Diagnostics Script" -ForegroundColor DarkCyan
     Write-Host " 6: Perform TPM Attestation Check" -ForegroundColor DarkMagenta
     Write-Host " 7: Download and Launch Process Explorer" -ForegroundColor DarkYellow
+    Write-Host " 8: Reboot Device Only" -ForegroundColor White
     Write-Host " Q: Exit" -ForegroundColor Red
     Write-Host "==========================================================" -ForegroundColor Cyan
 }
@@ -172,6 +173,17 @@ function Invoke-ProcessExplorer {
     Read-Host "`nPress Enter to continue..."
 }
 
+function Invoke-RebootDevice {
+    $choice = Read-Host "`nAre you sure you want to reboot the device now? (Y/N)"
+    if ($choice -in @('Y','y')) {
+        Write-Host "Rebooting device..." -ForegroundColor Yellow
+        Restart-Computer -Force
+    } else {
+        Write-Host "Reboot canceled." -ForegroundColor Green
+        Start-Sleep -Seconds 1
+    }
+}
+
 # Main execution loop.
 do {
     Show-Menu
@@ -184,6 +196,7 @@ do {
          '5' { Invoke-AutopilotDiagnosticsCommunity }
          '6' { Invoke-TpmAttestationCheck }
          '7' { Invoke-ProcessExplorer }
+         '8' { Invoke-RebootDevice }
          'Q' { break } 
          default {Write-host "`nInvalid selection!" -Foregroundcolor red}
      }
