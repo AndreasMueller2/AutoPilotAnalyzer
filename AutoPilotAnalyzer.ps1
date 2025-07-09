@@ -1,51 +1,28 @@
 <#
 .SYNOPSIS
-Autopilot Management Toolkit with Enhanced Diagnostics and Attestation Checks
+Autopilot Management Toolkit – Kompatibel mit Windows PowerShell 5.1
 
 .DESCRIPTION
-Provides functionality for managing Autopilot profiles, including:
-- Download and launch TeamViewer QuickSupport
-- Display current Autopilot configuration
-- Clean Autopilot profile and reboot
-- Register device in Autopilot with dynamic GroupTag input
-- Community diagnostics and TPM attestation verification
-- Download and launch Process Explorer (procexp.exe)
+- TeamViewer QuickSupport herunterladen und starten
+- Autopilot-Konfiguration anzeigen
+- Autopilot-Profil zurücksetzen und neu starten
+- Gerät in Autopilot registrieren
+- Community Diagnostics Script ausführen
+- TPM Attestation Check
+- Process Explorer herunterladen und starten
 
 .VERSION
-2.4.0
+2.4.1
 
 .AUTHOR
-Your Name
+Andreas Müller 2
 
 .NOTES
-Last Updated: April 25, 2025
-Requires: PowerShell 7.0+, Administrative Privileges
-Tested OS: Windows 10 22H2, Windows 11 23H2
-
-.LINK
-https://learn.microsoft.com/en-us/autopilot
+Getestet mit Windows PowerShell 5.1 (Windows 10 22H2, Windows 11 24H2)
 #>
 
-# Self-relaunch mechanism with execution policy bypass
-if ((Get-ExecutionPolicy -Scope Process) -ne 'Bypass') {
-    $scriptPath = $MyInvocation.MyCommand.Path
-    $arguments = @(
-        '-ExecutionPolicy Bypass',
-        '-NoProfile',
-        '-File "{}"' -f $scriptPath
-    ) -join ' '
-    
-    try {
-        Start-Process powershell.exe -ArgumentList $arguments -Verb RunAs
-    }
-    catch {
-        Write-Host "Elevation failed: User canceled UAC prompt" -ForegroundColor Red
-    }
-    exit
-}
-
-# Requires admin from this point forward
-#Requires -RunAsAdministrator
+# TLS 1.2 aktivieren für Web-Downloads
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 function Show-Menu {
     Clear-Host
@@ -64,17 +41,13 @@ function Show-Menu {
 function Invoke-TeamViewerQuickSupport {
     try {
         $tvPath = "$env:TEMP\TeamViewerQS.exe"
-        
         Write-Host "[$(Get-Date)] Downloading TeamViewer..." -ForegroundColor Gray
-        Invoke-WebRequest -Uri "https://download.teamviewer.com/download/TeamViewerQS.exe" `
-            -OutFile $tvPath -ErrorAction Stop
-
+        Invoke-WebRequest -Uri "https://download.teamviewer.com/download/TeamViewerQS.exe" -OutFile $tvPath -ErrorAction Stop
         if (Test-Path $tvPath) {
             Write-Host "Launching TeamViewer QuickSupport..." -ForegroundColor Cyan
             Start-Process -FilePath $tvPath
         }
-    }
-    catch {
+    } catch {
         Write-Host "[ERROR] TeamViewer operation failed: $_" -ForegroundColor Red
     }
 }
@@ -82,32 +55,24 @@ function Invoke-TeamViewerQuickSupport {
 function Show-AutopilotInfo {
     $configFile = "C:\Windows\ServiceState\wmansvc\AutopilotDDSZTDfile.json"
     $regPath = "HKLM:\SOFTWARE\Microsoft\Provisioning\Diagnostics\AutoPilot"
-
-    # Display configuration file
     if (Test-Path $configFile) {
         try {
             Write-Host "Opening configuration file..." -ForegroundColor Cyan
             Start-Process notepad.exe $configFile
-        }
-        catch {
+        } catch {
             Write-Host "[ERROR] File access denied: $configFile" -ForegroundColor Red
         }
-    }
-    else {
+    } else {
         Write-Host "Configuration file not found" -ForegroundColor Yellow
     }
-
-    # Display registry information
     if (Test-Path $regPath) {
         try {
             Write-Host "`nAutopilot Registry Configuration:" -ForegroundColor Cyan
             Get-ItemProperty -Path $regPath | Format-List *
-        }
-        catch {
+        } catch {
             Write-Host "[ERROR] Registry access denied" -ForegroundColor Red
         }
-    }
-    else {
+    } else {
         Write-Host "Registry keys not found" -ForegroundColor Yellow
     }
 }
@@ -115,30 +80,22 @@ function Show-AutopilotInfo {
 function Clear-AutopilotProfile {
     $configFile = "C:\Windows\ServiceState\wmansvc\AutopilotDDSZTDfile.json"
     $regPath = "HKLM:\SOFTWARE\Microsoft\Provisioning\Diagnostics\AutoPilot"
-
-    # Remove registry entries
     if (Test-Path $regPath) {
         try {
             Remove-Item -Path $regPath -Recurse -Force
             Write-Host "Registry entries cleared successfully" -ForegroundColor Green
-        }
-        catch {
+        } catch {
             Write-Host "[ERROR] Failed to remove registry keys: $_" -ForegroundColor Red
         }
     }
-
-    # Remove configuration file
     if (Test-Path $configFile) {
         try {
             Remove-Item -Path $configFile -Force
             Write-Host "Configuration file removed" -ForegroundColor Green
-        }
-        catch {
+        } catch {
             Write-Host "[ERROR] Failed to delete configuration file: $_" -ForegroundColor Red
         }
     }
-
-    # Reboot confirmation
     $choice = Read-Host "`nReboot required. Proceed? (Y/N)"
     if ($choice -in ('Y','y')) {
         Restart-Computer -Force
@@ -149,94 +106,53 @@ function Register-AutopilotDevice {
     try {
         $groupTag = Read-Host "`nEnter GroupTag for registration"
         $workingDir = "C:\HWID"
-        
-        # Environment setup for TLS and working directory creation.
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        
+        if (!(Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
+            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+        }
         New-Item -Path $workingDir -ItemType Directory -Force | Out-Null 
         Set-Location -Path $workingDir
-
-        # Install required PowerShell modules and scripts.
-        Install-PackageProvider `
-            -Name NuGet `
-            -MinimumVersion 2.8.5.201 `
-            -Force | Out-Null
-        
-        Install-Script `
-            -Name Get-WindowsAutopilotInfo `
-            -Confirm:$false `
-            -Force | Out-Null
-
-        # Generate output filename based on computer name.
+        if (!(Get-Command Get-WindowsAutopilotInfo -ErrorAction SilentlyContinue)) {
+            Install-Script -Name Get-WindowsAutopilotInfo -Force
+        }
         $outputFile = "AutopilotHWID-$($env:COMPUTERNAME).csv"
-
-        # Execute the script to collect hardware hash and register device.
-        Get-WindowsAutopilotInfo `
-            -GroupTag $groupTag `
-            -Online `
-            -OutputFile $outputFile
-        
-        Write-Host "`nRegistration successful!" `
-            -ForegroundColor Green
-        
-        Write-Host "`nOutput file saved at: $workingDir\$outputFile" `
-            -ForegroundColor Cyan
-
-    }
-    catch {
-        Write-Host "[ERROR] Registration failed: $_" `
-            -ForegroundColor Red
-
+        & "$env:ProgramFiles\WindowsPowerShell\Scripts\Get-WindowsAutopilotInfo.ps1" -GroupTag $groupTag -Online -OutputFile $outputFile
+        Write-Host "`nRegistration successful!" -ForegroundColor Green
+        Write-Host "`nOutput file saved at: $workingDir\$outputFile" -ForegroundColor Cyan
+    } catch {
+        Write-Host "[ERROR] Registration failed: $_" -ForegroundColor Red
     }
 }
 
 function Invoke-AutopilotDiagnosticsCommunity {
     try {
-        Write-Host "Installing Get-AutopilotDiagnosticsCommunity from PowerShell Gallery..." -ForegroundColor Cyan
-        Install-Script -Name Get-AutopilotDiagnosticsCommunity -Force -ErrorAction Stop
-
-        Write-Host "Running Get-AutopilotDiagnosticsCommunity script locally..." -ForegroundColor Cyan
-        $scriptPath = Join-Path -Path (Get-Location) -ChildPath "Get-AutopilotDiagnosticsCommunity.ps1"
+        if (!(Get-Command Get-AutopilotDiagnosticsCommunity.ps1 -ErrorAction SilentlyContinue)) {
+            Install-Script -Name Get-AutopilotDiagnosticsCommunity -Force
+        }
+        $scriptPath = "$env:ProgramFiles\WindowsPowerShell\Scripts\Get-AutopilotDiagnosticsCommunity.ps1"
         if (Test-Path $scriptPath) {
             & $scriptPath
         } else {
-            # Try to find it in default script path
-            $defaultScriptPath = "$env:ProgramFiles\WindowsPowerShell\Scripts\Get-AutopilotDiagnosticsCommunity.ps1"
-            if (Test-Path $defaultScriptPath) {
-                & $defaultScriptPath
-            } else {
-                Write-Host "[ERROR] Get-AutopilotDiagnosticsCommunity.ps1 not found after installation." -ForegroundColor Red
-            }
+            Write-Host "[ERROR] Get-AutopilotDiagnosticsCommunity.ps1 not found after installation." -ForegroundColor Red
         }
-    }
-    catch {
+    } catch {
         Write-Host "[ERROR] Failed to install or run Get-AutopilotDiagnosticsCommunity: $_" -ForegroundColor Red
     }
-    finally {
-        Read-Host "`nPress Enter to continue..."
-    }
+    Read-Host "`nPress Enter to continue..."
 }
 
 function Invoke-TpmAttestationCheck {
     try {
-        Write-Host "`nInstalling AutopilotTestAttestation Module..." -ForegroundColor Cyan
-        Install-Module -Name Autopilottestattestation -Force -ErrorAction Stop
-
-        Write-Host "Setting Execution Policy for this session..." -ForegroundColor Cyan
+        if (!(Get-Module -Name Autopilottestattestation -ListAvailable)) {
+            Install-Module -Name Autopilottestattestation -Force
+        }
         Set-ExecutionPolicy RemoteSigned -Scope Process -Force
-
-        Write-Host "Importing Module..." -ForegroundColor Cyan
         Import-Module -Name Autopilottestattestation -Force
-
         Write-Host "`n=== TPM Attestation Check ===" -ForegroundColor Yellow
         Test-AutopilotAttestation
-    }
-    catch {
+    } catch {
         Write-Host "[ERROR] TPM Check failed: $_" -ForegroundColor Red
     }
-    finally {
-        Read-Host "`nPress Enter to continue..."
-    }
+    Read-Host "`nPress Enter to continue..."
 }
 
 function Invoke-ProcessExplorer {
@@ -244,29 +160,22 @@ function Invoke-ProcessExplorer {
         $procexpPath = "$env:TEMP\procexp.exe"
         Write-Host "[$(Get-Date)] Downloading Process Explorer (procexp.exe)..." -ForegroundColor Gray
         Invoke-WebRequest -Uri "https://live.sysinternals.com/procexp.exe" -OutFile $procexpPath -ErrorAction Stop
-
         if (Test-Path $procexpPath) {
             Write-Host "Launching Process Explorer..." -ForegroundColor Cyan
             Start-Process -FilePath $procexpPath
         } else {
             Write-Host "[ERROR] procexp.exe not found after download." -ForegroundColor Red
         }
-    }
-    catch {
+    } catch {
         Write-Host "[ERROR] Failed to download or launch Process Explorer: $_" -ForegroundColor Red
     }
-    finally {
-        Read-Host "`nPress Enter to continue..."
-    }
+    Read-Host "`nPress Enter to continue..."
 }
 
 # Main execution loop.
 do {
     Show-Menu
-    
-    # Prompt user for menu selection.
     $selection = Read-Host "`nEnter selection"
-
     switch ($selection) {        
          '1' { Invoke-TeamViewerQuickSupport } 
          '2' { Show-AutopilotInfo } 
