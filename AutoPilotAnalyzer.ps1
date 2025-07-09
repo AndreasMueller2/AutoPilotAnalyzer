@@ -14,10 +14,13 @@ Autopilot Management Toolkit – Kompatibel mit Windows PowerShell 5.1
 - TPM sicher löschen (für OS-Downgrade-Szenarien)
 - 10: Open wmansvc folder in Explorer
 - 11: Open AutopilotDDSZTDFile.json in Notepad
+- 12: Open AutoPilotAnalyzer GitHub in Edge
+- 13: Open c:\AutoPilotAnalyzer.ps1 in PowerShell ISE
+
 
 
 .VERSION
-2.6.0
+2.7.0
 
 .AUTHOR
 Andreas Müller 2
@@ -42,6 +45,8 @@ function Show-Menu {
     Write-Host " 9: Downgrade OS to Win10 22H2 or Win11 23H2 - Clear TPM" -ForegroundColor DarkRed
     Write-Host " 10: Open wmansvc folder in Explorer" -ForegroundColor DarkGreen
     Write-Host " 11: Open AutopilotDDSZTDFile.json in Notepad" -ForegroundColor DarkGreen
+    Write-Host " 12: Open AutoPilotAnalyzer GitHub in Edge" -ForegroundColor Blue
+    Write-Host " 13: Open c:\AutoPilotAnalyzer.ps1 in PowerShell ISE" -ForegroundColor Blue
     Write-Host " Q: Exit" -ForegroundColor Red
     Write-Host "==========================================================" -ForegroundColor Cyan
 }
@@ -228,6 +233,27 @@ function Invoke-ClearTPM-AfterDowngrade  {
             Write-Host "File not found: $filePath" -ForegroundColor Red
         }
     }
+
+    function Open-GitHubAutoPilotAnalyzer {
+        $url = "https://github.com/AndreasMueller2/AutoPilotAnalyzer"
+        try {
+            Write-Host "Opening GitHub page in Microsoft Edge..." -ForegroundColor Cyan
+            Start-Process "msedge.exe" $url
+        } catch {
+            Write-Host "[ERROR] Could not open Edge or URL: $_" -ForegroundColor Red
+        }
+    }
+    
+    function Open-AutoPilotAnalyzerInISE {
+        $filePath = "C:\AutoPilotAnalyzer.ps1"
+        if (Test-Path $filePath) {
+            Write-Host "Opening $filePath in PowerShell ISE..." -ForegroundColor Cyan
+            Start-Process powershell_ise.exe $filePath
+        } else {
+            Write-Host "File not found: $filePath" -ForegroundColor Red
+        }
+    }
+    
     
 }
 
@@ -247,6 +273,8 @@ do {
          '9' { Invoke-ClearTPM-AfterDowngrade }
          '10' { Open-WmansvcFolder }
          '11' { Open-AutopilotConfigFile }
+         '12' { Open-GitHubAutoPilotAnalyzer }
+         '13' { Open-AutoPilotAnalyzerInISE }
          'Q' { break } 
          default {Write-host "`nInvalid selection!" -Foregroundcolor red}
      }
